@@ -18,7 +18,11 @@
 package com.ichi2.anki
 
 import android.app.DownloadManager
-import android.content.*
+import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
@@ -31,11 +35,13 @@ import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import com.ichi2.anki.SharedDecksActivity.Companion.DOWNLOAD_FILE
 import com.ichi2.anki.snackbar.showSnackbar
 import com.ichi2.compat.CompatHelper.Companion.getSerializableCompat
+import com.ichi2.compat.CompatHelper.Companion.registerReceiverCompat
 import com.ichi2.utils.ImportUtils
 import com.ichi2.utils.create
 import timber.log.Timber
@@ -151,7 +157,11 @@ class SharedDecksDownloadFragment : Fragment(R.layout.fragment_shared_decks_down
         }
         // Register broadcast receiver for download completion.
         Timber.d("Registering broadcast receiver for download completion")
-        activity?.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        activity?.registerReceiverCompat(
+            onComplete,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_EXPORTED
+        )
 
         val currentFileName = URLUtil.guessFileName(
             fileToBeDownloaded.url,
