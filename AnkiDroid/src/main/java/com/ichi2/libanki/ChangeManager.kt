@@ -22,7 +22,7 @@
  * The optional handler argument can be used so that the initiator of an action can tell when a
  * OpChanges action was caused by itself. This can be useful when the default change behaviour
  * should be ignored, in favour of specific handling (eg the UI wishes to directly update the
- * displayed flag, without redrawing the entire review screen).
+ * displayed flag, without redrawing the entire study screen).
  */
 
 package com.ichi2.libanki
@@ -99,7 +99,7 @@ object ChangeManager {
         subscribers.clear()
     }
 
-    internal fun <T> notifySubscribers(
+    internal fun <T : Any> notifySubscribers(
         changes: T,
         initiator: Any?,
     ) {
@@ -111,7 +111,7 @@ object ChangeManager {
                 is OpChangesAfterUndo -> changes.changes
                 is OpChangesOnly -> changes.changes
                 is ImportResponse -> changes.changes
-                else -> TODO("unhandled change type")
+                else -> TODO("unhandled change type of class '${changes::class}'")
             }
         notifySubscribers(opChanges, initiator)
     }
@@ -143,7 +143,7 @@ object ChangeManager {
 
 /** Wrap a routine that returns OpChanges* or similar undo info with this
  * to notify change subscribers of the changes. */
-suspend fun <T> undoableOp(
+suspend fun <T : Any> undoableOp(
     handler: Any? = null,
     block: Collection.() -> T,
 ): T =

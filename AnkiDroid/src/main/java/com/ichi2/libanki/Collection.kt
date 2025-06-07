@@ -578,12 +578,10 @@ class Collection(
 
     /** Save (flush) the note to the DB. Unlike note.flush(), this is undoable. This should
      * not be used for adding new notes. */
+    @CheckResult
     fun updateNote(note: Note): OpChanges = backend.updateNotes(notes = listOf(note.toBackendNote()), skipUndoEntry = false)
 
     fun updateNotes(notes: Iterable<Note>): OpChanges = backend.updateNotes(notes = notes.map { it.toBackendNote() }, skipUndoEntry = false)
-
-    @NotInLibAnki
-    fun emptyCids(): List<CardId> = getEmptyCards().emptyCids()
 
     /** Fixes and optimizes the database. If any errors are encountered, a list of
      * problems is returned. Throws if DB is unreadable. */

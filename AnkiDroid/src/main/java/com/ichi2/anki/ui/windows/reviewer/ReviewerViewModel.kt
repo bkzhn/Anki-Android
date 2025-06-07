@@ -57,7 +57,9 @@ import com.ichi2.anki.ui.windows.reviewer.autoadvance.AutoAdvance
 import com.ichi2.anki.utils.Destination
 import com.ichi2.anki.utils.ext.flag
 import com.ichi2.anki.utils.ext.setUserFlagForCards
+import com.ichi2.libanki.CardId
 import com.ichi2.libanki.ChangeManager
+import com.ichi2.libanki.NoteId
 import com.ichi2.libanki.redo
 import com.ichi2.libanki.sched.Counts
 import com.ichi2.libanki.sched.CurrentQueueState
@@ -96,6 +98,8 @@ class ReviewerViewModel(
     val countsFlow = MutableStateFlow(Counts() to Counts.Queue.NEW)
     val typeAnswerFlow = MutableStateFlow<TypeAnswer?>(null)
     val destinationFlow = MutableSharedFlow<Destination>()
+    val editNoteTagsFlow = MutableSharedFlow<NoteId>()
+    val setDueDateFlow = MutableSharedFlow<CardId>()
 
     override val server = AnkiServer(this).also { it.start() }
     private val stateMutationKey = TimeManager.time.intTimeMS().toString()
@@ -146,10 +150,6 @@ class ReviewerViewModel(
             }
         }
     }
-
-    /* *********************************************************************************************
-     ************************ Public methods: meant to be used by the View **************************
-     ********************************************************************************************* */
 
     override fun onPageFinished(isAfterRecreation: Boolean) {
         Timber.v("ReviewerViewModel::onPageFinished %b", isAfterRecreation)
@@ -237,12 +237,6 @@ class ReviewerViewModel(
     }
 
     private suspend fun emitAddNoteDestination() = destinationFlow.emit(NoteEditorLauncher.AddNoteFromReviewer())
-
-    fun refreshCard() {
-        launchCatchingIO {
-            updateCurrentCard()
-        }
-    }
 
     private suspend fun emitCardInfoDestination() {
         val destination = CardInfoDestination(currentCard.await().id)
@@ -361,10 +355,6 @@ class ReviewerViewModel(
             autoAdvance.onShowQuestion()
         }
     }
-
-    /* *********************************************************************************************
-     *************************************** Internal methods ***************************************
-     ********************************************************************************************* */
 
     override suspend fun handlePostRequest(
         uri: String,
@@ -523,18 +513,47 @@ class ReviewerViewModel(
         }
     }
 
+    private suspend fun editNoteTags() {
+        val noteId = currentCard.await().nid
+        editNoteTagsFlow.emit(noteId)
+    }
+
+    fun onEditedTags(selectedTags: List<String>) {
+        launchCatchingIO {
+            val card = currentCard.await()
+            val note = withCol { card.note(this@withCol) }
+            if (note.tags == selectedTags) {
+                Timber.d("No changed tags")
+                return@launchCatchingIO
+            }
+
+            val tagsString = selectedTags.joinToString(" ")
+            withCol { note.setTagsFromStr(this@withCol, tagsString) }
+            undoableOp {
+                updateNote(note)
+            }
+        }
+    }
+
+    private suspend fun launchSetDueDate() {
+        val cardId = currentCard.await().id
+        setDueDateFlow.emit(cardId)
+    }
+
     private fun executeAction(action: ViewerAction) {
-        Timber.v("ReviewerViewModel::executeAction")
+        Timber.v("ReviewerViewModel::executeAction %s", action.name)
         launchCatchingIO {
             when (action) {
                 ViewerAction.ADD_NOTE -> emitAddNoteDestination()
                 ViewerAction.CARD_INFO -> emitCardInfoDestination()
                 ViewerAction.DECK_OPTIONS -> emitDeckOptionsDestination()
                 ViewerAction.EDIT -> emitEditNoteDestination()
+                ViewerAction.TAG -> editNoteTags()
                 ViewerAction.DELETE -> deleteNote()
                 ViewerAction.MARK -> toggleMark()
                 ViewerAction.REDO -> redo()
                 ViewerAction.UNDO -> undo()
+                ViewerAction.RESCHEDULE_NOTE -> launchSetDueDate()
                 ViewerAction.TOGGLE_AUTO_ADVANCE -> toggleAutoAdvance()
                 ViewerAction.BURY_NOTE -> buryNote()
                 ViewerAction.BURY_CARD -> buryCard()
@@ -603,7 +622,6 @@ class ReviewerViewModel(
         changes: OpChanges,
         handler: Any?,
     ) {
-        Timber.v("ReviewerViewModel::opExecuted")
         launchCatchingIO {
             updateUndoAndRedoLabels()
 
