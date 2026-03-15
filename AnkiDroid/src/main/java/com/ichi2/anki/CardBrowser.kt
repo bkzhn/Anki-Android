@@ -166,7 +166,6 @@ open class CardBrowser :
 
     lateinit var tagsDialogFactory: TagsDialogFactory
     private val searchItem: MenuItem? get() = cardBrowserFragment.searchItem
-    private var saveSearchItem: MenuItem? = null
     private val mySearchesItem: MenuItem? get() = cardBrowserFragment.mySearchesItem
 
     // card that was clicked (not marked)
@@ -904,9 +903,6 @@ open class CardBrowser :
         onAddNoteActivityResult.launch(addNoteLauncher.toIntent(this))
     }
 
-    private val reviewerCardId: CardId
-        get() = intent.getLongExtra("currentCard", -1)
-
     public override fun onSaveInstanceState(outState: Bundle) {
         // Save current search terms
         outState.putString("mSearchTerms", viewModel.searchTerms)
@@ -968,6 +964,11 @@ open class CardBrowser :
                 }
             }
             invalidateOptionsMenu()
+            // HACK: required now we use MenuProvider for searches
+            // this causes a very brief flicker, as we call `setQuery` to restore the menu state
+            searchView?.post {
+                searchView?.clearFocus()
+            }
         }
     }
 
